@@ -1,4 +1,4 @@
-//
+    //
 //  ANiceClockApp.swift
 //  ANiceClock
 //
@@ -12,6 +12,8 @@ struct ANiceClockApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.dark) // Default to dark mode for nightstand use
+                .statusBarHidden() // Hide status bar for cleaner look
         }
     }
 }
