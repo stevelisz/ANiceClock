@@ -12,28 +12,28 @@ import Photos
 
 struct ContentView: View {
     @State private var currentTime = Date()
-    @State private var brightness: Double = 0.8
-    @State private var isNightMode = false
-    @State private var isAutoNightMode = true
+    @AppStorage("ANiceClock_brightness") private var brightness: Double = 0.8
+    @AppStorage("ANiceClock_isNightMode") private var isNightMode = false
+    @AppStorage("ANiceClock_isAutoNightMode") private var isAutoNightMode = true
     @State private var showSettings = false
-    @State private var is24HourFormat = false
-    @State private var showSeconds = true
-    @State private var showDate = true
-    @State private var showWeather = true
-    @State private var showBattery = true
-    @State private var showCalendar = true
-    @State private var nightColorTheme: NightColorTheme = .red
+    @AppStorage("ANiceClock_is24HourFormat") private var is24HourFormat = false
+    @AppStorage("ANiceClock_showSeconds") private var showSeconds = true
+    @AppStorage("ANiceClock_showDate") private var showDate = true
+    @AppStorage("ANiceClock_showWeather") private var showWeather = true
+    @AppStorage("ANiceClock_showBattery") private var showBattery = true
+    @AppStorage("ANiceClock_showCalendar") private var showCalendar = true
+    @AppStorage("ANiceClock_nightColorTheme") private var nightColorTheme: NightColorTheme = .red
     @State private var batteryLevel: Float = 0.0
     @State private var isCharging = false
     @State private var deviceOrientation = UIDeviceOrientation.unknown
-    @State private var viewMode: ViewMode = .clock
-    @State private var glassPanelOpacity: Double = 0.85 // Default glass panel opacity
+    @AppStorage("ANiceClock_viewMode") private var viewMode: ViewMode = .clock
+    @AppStorage("ANiceClock_glassPanelOpacity") private var glassPanelOpacity: Double = 0.85
     
     @StateObject private var weatherService = WeatherService()
     @StateObject private var calendarService = CalendarService()
     @StateObject private var galleryManager = GalleryManager()
     @State private var showingPhotoPicker = false
-    @State private var galleryDuration: Double = 10.0 // Slideshow duration in seconds
+    @AppStorage("ANiceClock_galleryDuration") private var galleryDuration: Double = 10.0
     
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
@@ -92,12 +92,8 @@ struct ContentView: View {
             UIApplication.shared.isIdleTimerDisabled = true
             updateBatteryStatus()
             weatherService.fetchWeather()
-            // Initialize brightness to a reasonable default (80%)
-            brightness = 0.8
-            // Sync UI with the saved gallery duration from manager
-            galleryDuration = galleryManager.slideshowDuration
-            print("🔆 App brightness initialized to: \(brightness)")
-            print("🔵 Synced gallery duration from manager: \(galleryDuration)")
+            // Sync gallery duration with manager
+            galleryManager.updateSlideshowDuration(galleryDuration)
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false

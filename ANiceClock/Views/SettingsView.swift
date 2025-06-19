@@ -114,61 +114,71 @@ struct SettingsView: View {
                     .padding(.bottom, 30)
                     
                     // Gallery Settings
-                    Section("Gallery") {
-                        HStack {
-                            Text("Selected Photos")
-                            Spacer()
-                            Text("\(galleryManager.selectedPhotos.count)")
-                                .foregroundColor(.secondary)
-                        }
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Gallery")
+                            .font(.headline)
+                            .padding(.horizontal, 20)
                         
-                        HStack {
-                            PhotoPickerView(galleryManager: galleryManager, isPresented: $showingPhotoPicker)
-                            
-                            Spacer()
-                            
-                            Button("Clear All") {
-                                galleryManager.clearAllPhotos()
-                            }
-                            .foregroundColor(.red)
-                            .disabled(galleryManager.selectedPhotos.isEmpty)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(spacing: 12) {
                             HStack {
-                                Text("Slideshow Duration")
+                                Text("Selected Photos")
                                 Spacer()
-                                Text("\(Int(galleryDuration))s")
+                                Text("\(galleryManager.selectedPhotos.count)")
                                     .foregroundColor(.secondary)
                             }
+                            Divider().padding(.leading, 20)
                             
-                            Slider(
-                                value: $galleryDuration,
-                                in: 5...60,
-                                step: 5
-                            )
-                            .onChange(of: galleryDuration) { _, newValue in
-                                galleryManager.updateSlideshowDuration(newValue)
-                            }
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 8) {
                             HStack {
-                                Text("Info Panel Transparency")
+                                PhotoPickerView(galleryManager: galleryManager, isPresented: $showingPhotoPicker)
+                                
                                 Spacer()
-                                Text("\(Int((1.0 - glassPanelOpacity) * 100))%")
-                                    .foregroundColor(.secondary)
+                                
+                                Button("Clear All") {
+                                    galleryManager.clearAllPhotos()
+                                }
+                                .foregroundColor(.red)
+                                .disabled(galleryManager.selectedPhotos.isEmpty)
                             }
+                            Divider().padding(.leading, 20)
                             
-                            Slider(
-                                value: Binding(
-                                    get: { 1.0 - glassPanelOpacity },
-                                    set: { glassPanelOpacity = 1.0 - $0 }
-                                ),
-                                in: 0...1,
-                                step: 0.05
-                            )
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Slideshow Duration")
+                                    Spacer()
+                                    Text("\(Int(galleryDuration))s")
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Slider(
+                                    value: $galleryDuration,
+                                    in: 5...60,
+                                    step: 5
+                                )
+                                .onChange(of: galleryDuration) { _, newValue in
+                                    galleryManager.updateSlideshowDuration(newValue)
+                                }
+                            }
+                            Divider().padding(.leading, 20)
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Info Panel Transparency")
+                                    Spacer()
+                                    Text("\(Int((1.0 - glassPanelOpacity) * 100))%")
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Slider(
+                                    value: Binding(
+                                        get: { 1.0 - glassPanelOpacity },
+                                        set: { glassPanelOpacity = 1.0 - $0 }
+                                    ),
+                                    in: 0...1,
+                                    step: 0.05
+                                )
+                            }
                         }
+                        .padding(.horizontal, 20)
                     }
                     .padding(.bottom, 30)
                     
