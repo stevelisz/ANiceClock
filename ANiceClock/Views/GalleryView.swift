@@ -9,6 +9,7 @@ struct GalleryView: View {
     let showDate: Bool
     let showWeather: Bool
     let glassPanelOpacity: Double
+    let fontFamily: FontFamily
     @ObservedObject var weatherService: WeatherService
     @ObservedObject var galleryManager: GalleryManager
     let onTapToGoBack: () -> Void
@@ -24,7 +25,7 @@ struct GalleryView: View {
     private let panelPositionYKey = "ANiceClock_GalleryPanelY"
     
     // Initialize with saved position or default
-    init(currentTime: Date, brightness: Double, is24HourFormat: Bool, showSeconds: Bool, showDate: Bool, showWeather: Bool, glassPanelOpacity: Double, weatherService: WeatherService, galleryManager: GalleryManager, onTapToGoBack: @escaping () -> Void) {
+    init(currentTime: Date, brightness: Double, is24HourFormat: Bool, showSeconds: Bool, showDate: Bool, showWeather: Bool, glassPanelOpacity: Double, fontFamily: FontFamily, weatherService: WeatherService, galleryManager: GalleryManager, onTapToGoBack: @escaping () -> Void) {
         self.currentTime = currentTime
         self.brightness = brightness
         self.is24HourFormat = is24HourFormat
@@ -32,6 +33,7 @@ struct GalleryView: View {
         self.showDate = showDate
         self.showWeather = showWeather
         self.glassPanelOpacity = glassPanelOpacity
+        self.fontFamily = fontFamily
         self.weatherService = weatherService
         self.galleryManager = galleryManager
         self.onTapToGoBack = onTapToGoBack
@@ -65,6 +67,7 @@ struct GalleryView: View {
                     showDate: showDate,
                     showWeather: showWeather,
                     glassPanelOpacity: glassPanelOpacity,
+                    fontFamily: fontFamily,
                     weatherService: weatherService,
                     onTapToGoBack: onTapToGoBack,
                     isDragging: isDragging
@@ -193,6 +196,7 @@ struct GalleryInfoPanel: View {
     let showDate: Bool
     let showWeather: Bool
     let glassPanelOpacity: Double
+    let fontFamily: FontFamily
     @ObservedObject var weatherService: WeatherService
     let onTapToGoBack: () -> Void
     let isDragging: Bool
@@ -206,14 +210,14 @@ struct GalleryInfoPanel: View {
             // Time Display - Primary hierarchy
             HStack(alignment: .lastTextBaseline, spacing: 4) {
                 Text(galleryTimeString)
-                    .font(.system(size: 48, weight: .light, design: .default))
+                    .font(fontFamily.font(size: 48, weight: .light))
                     .foregroundStyle(Color.white)
                     .shadow(color: .black.opacity(0.8), radius: 4, x: 2, y: 2)
                     .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 0)
                 
                 if showSeconds {
                     Text(gallerySecondsString)
-                        .font(.system(size: 20, weight: .light, design: .default))
+                        .font(fontFamily.font(size: 20, weight: .light))
                         .foregroundStyle(Color.white.opacity(0.9))
                         .shadow(color: .black.opacity(0.7), radius: 3, x: 1, y: 1)
                         .offset(y: -6)
@@ -223,7 +227,7 @@ struct GalleryInfoPanel: View {
             // Date Display - Secondary hierarchy
             if showDate {
                 Text(galleryDateString)
-                    .font(.system(size: 16, weight: .medium, design: .default))
+                    .font(fontFamily.font(size: 16, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.95))
                     .shadow(color: .black.opacity(0.7), radius: 3, x: 1, y: 1)
                     .padding(.top, 2)
@@ -238,7 +242,7 @@ struct GalleryInfoPanel: View {
                             .shadow(color: .black.opacity(0.6), radius: 2, x: 1, y: 1)
                         
                         Text("\(Int(current.main.temp.rounded()))°")
-                            .font(.system(size: 16, weight: .medium, design: .default))
+                            .font(fontFamily.font(size: 16, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.95))
                             .shadow(color: .black.opacity(0.7), radius: 3, x: 1, y: 1)
                         
@@ -249,7 +253,7 @@ struct GalleryInfoPanel: View {
                     let locationName = weatherService.selectedCity?.name ?? weatherService.currentLocationName ?? "Unknown Location"
                     if !locationName.isEmpty && locationName != "Unknown Location" {
                         Text(locationName)
-                            .font(.system(size: 14, weight: .regular, design: .default))
+                            .font(fontFamily.font(size: 14, weight: .regular))
                             .foregroundStyle(Color.white.opacity(0.8))
                             .shadow(color: .black.opacity(0.6), radius: 2, x: 1, y: 1)
                     }

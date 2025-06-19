@@ -23,6 +23,8 @@ struct ContentView: View {
     @AppStorage("ANiceClock_showBattery") private var showBattery = true
     @AppStorage("ANiceClock_showCalendar") private var showCalendar = true
     @AppStorage("ANiceClock_nightColorTheme") private var nightColorTheme: NightColorTheme = .red
+    @AppStorage("ANiceClock_fontFamily") private var fontFamily: FontFamily = .system
+
     @State private var batteryLevel: Float = 0.0
     @State private var isCharging = false
     @State private var deviceOrientation = UIDeviceOrientation.unknown
@@ -56,6 +58,7 @@ struct ContentView: View {
                         showBattery: $showBattery,
                         showCalendar: $showCalendar,
                         nightColorTheme: $nightColorTheme,
+                        fontFamily: $fontFamily,
                         batteryLevel: $batteryLevel,
                         isCharging: $isCharging,
                         deviceOrientation: $deviceOrientation,
@@ -73,6 +76,7 @@ struct ContentView: View {
                         showDate: showDate,
                         showWeather: showWeather,
                         glassPanelOpacity: glassPanelOpacity,
+                        fontFamily: fontFamily,
                         weatherService: weatherService,
                         galleryManager: galleryManager,
                         onTapToGoBack: {
@@ -113,6 +117,7 @@ struct ContentView: View {
                 showBattery: $showBattery,
                 showCalendar: $showCalendar,
                 nightColorTheme: $nightColorTheme,
+                fontFamily: $fontFamily,
                 glassPanelOpacity: $glassPanelOpacity,
                 weatherService: weatherService,
                 viewMode: $viewMode,

@@ -109,4 +109,104 @@ enum ViewMode: String, CaseIterable {
     var displayName: String {
         return self.rawValue
     }
+}
+
+// Font Family Enum
+enum FontFamily: String, CaseIterable {
+    case system = "System"
+    case avenir = "Avenir Next"
+    case helvetica = "Helvetica Neue"
+    case futura = "Futura"
+    case palatino = "Palatino"
+    case optima = "Optima"
+    case baskerville = "Baskerville"
+    case georgia = "Georgia"
+    case courier = "Courier New"
+    case menlo = "Menlo"
+    case americanTypewriter = "American Typewriter"
+    case sfMono = "SF Mono"
+    case chalkduster = "Chalkduster"
+    case digitalClock = "Digital Clock"
+    
+    var displayName: String {
+        return self.rawValue
+    }
+    
+    var fontName: String {
+        switch self {
+        case .system: return ".AppleSystemUIFont"
+        case .avenir: return "AvenirNext-Regular"
+        case .helvetica: return "HelveticaNeue"
+        case .futura: return "Futura-Medium"
+        case .palatino: return "Palatino-Roman"
+        case .optima: return "Optima-Regular"
+        case .baskerville: return "Baskerville"
+        case .georgia: return "Georgia"
+        case .courier: return "CourierNewPSMT"
+        case .menlo: return "Menlo-Regular"
+        case .americanTypewriter: return "AmericanTypewriter"
+        case .sfMono: return "SFMono-Regular"
+        case .chalkduster: return "Chalkduster"
+        case .digitalClock: return "Menlo-Regular" // We'll override this with custom styling
+        }
+    }
+    
+    func font(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        switch self {
+        case .system:
+            return .system(size: size, weight: weight, design: .default)
+        case .digitalClock:
+            // Create a digital clock effect using monospaced font with heavy weight
+            return .system(size: size, weight: .black, design: .monospaced)
+        default:
+            return .custom(fontName, size: size)
+        }
+    }
+}
+
+// Digital Clock Text Modifier for LED/LCD effect
+struct DigitalClockTextModifier: ViewModifier {
+    let fontFamily: FontFamily
+    let size: CGFloat
+    let weight: Font.Weight
+    let isNightMode: Bool
+    
+    func body(content: Content) -> some View {
+        if fontFamily == .digitalClock {
+            content
+                .font(.system(size: size, weight: .black, design: .monospaced))
+                .foregroundStyle(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            isNightMode ? Color.red : Color.primary,
+                            isNightMode ? Color.red.opacity(0.8) : Color.primary.opacity(0.8)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(
+                    color: isNightMode ? Color.red.opacity(0.8) : Color.clear,
+                    radius: isNightMode ? 8 : 0,
+                    x: 0,
+                    y: 0
+                )
+                .shadow(
+                    color: isNightMode ? Color.red.opacity(0.4) : Color.clear,
+                    radius: isNightMode ? 16 : 0,
+                    x: 0,
+                    y: 0
+                )
+                .tracking(2) // Add letter spacing for digital effect
+        } else {
+            content
+                .font(fontFamily.font(size: size, weight: weight))
+        }
+    }
+}
+
+extension View {
+    func digitalClockStyle(fontFamily: FontFamily, size: CGFloat, weight: Font.Weight = .regular, isNightMode: Bool = false) -> some View {
+        self.modifier(DigitalClockTextModifier(fontFamily: fontFamily, size: size, weight: weight, isNightMode: isNightMode))
+    }
 } 

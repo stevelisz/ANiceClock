@@ -10,8 +10,14 @@ import Testing
 
 struct ANiceClockTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    @Test func testAppLaunchState() async throws {
+        // Test that the app can initialize properly
+        let weatherService = WeatherService()
+        let galleryManager = GalleryManager()
+        
+        // Verify services initialize correctly
+        #expect(weatherService.currentWeather == nil)
+        #expect(galleryManager.selectedAssetIDs.isEmpty)
     }
 
 }

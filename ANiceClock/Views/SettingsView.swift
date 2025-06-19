@@ -13,6 +13,7 @@ struct SettingsView: View {
     @Binding var showBattery: Bool
     @Binding var showCalendar: Bool
     @Binding var nightColorTheme: NightColorTheme
+    @Binding var fontFamily: FontFamily
     @Binding var glassPanelOpacity: Double
     @ObservedObject var weatherService: WeatherService
     @Binding var viewMode: ViewMode
@@ -71,6 +72,28 @@ struct SettingsView: View {
                     }
                     .padding(.bottom, 30)
                     
+                    // Font Settings
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Font")
+                            .font(.headline)
+                            .padding(.horizontal, 20)
+                        
+                        VStack(spacing: 12) {
+                            HStack {
+                                Text("Font Family")
+                                Spacer()
+                                Picker("Font Family", selection: $fontFamily) {
+                                    ForEach(FontFamily.allCases, id: \.self) { font in
+                                        Text(font.displayName).tag(font)
+                                    }
+                                }
+                                .pickerStyle(MenuPickerStyle())
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.bottom, 30)
+                    
                     // Night Mode Settings
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Night Mode")
@@ -84,13 +107,20 @@ struct SettingsView: View {
                             
                             // Color Theme Selection with Visual Colors
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Color Theme")
+                                Text("Nightmode Color Theme")
                                     .foregroundColor(isNightMode ? .primary : .secondary)
                                 
                                 HStack(spacing: 16) {
                                     ForEach(NightColorTheme.allCases, id: \.self) { theme in
                                         Button(action: {
-                                            nightColorTheme = theme
+                                            // Add haptic feedback for better responsiveness
+                                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                            impactFeedback.impactOccurred()
+                                            
+                                            // Update the theme with animation
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                nightColorTheme = theme
+                                            }
                                         }) {
                                             Circle()
                                                 .fill(theme.color)
@@ -98,13 +128,19 @@ struct SettingsView: View {
                                                 .overlay(
                                                     Circle()
                                                         .stroke(nightColorTheme == theme ? Color.white : Color.clear, lineWidth: 3)
+                                                        .animation(.easeInOut(duration: 0.2), value: nightColorTheme)
                                                 )
                                                 .overlay(
                                                     Circle()
                                                         .stroke(nightColorTheme == theme ? Color.gray : Color.clear, lineWidth: 1)
+                                                        .animation(.easeInOut(duration: 0.2), value: nightColorTheme)
                                                 )
+                                                .scaleEffect(nightColorTheme == theme ? 1.1 : 1.0)
+                                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: nightColorTheme)
                                         }
                                         .disabled(isNightMode == false)
+                                        .opacity(isNightMode ? 1.0 : 0.5)
+                                        .animation(.easeInOut(duration: 0.2), value: isNightMode)
                                     }
                                 }
                             }

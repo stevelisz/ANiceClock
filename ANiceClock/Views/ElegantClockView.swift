@@ -13,6 +13,7 @@ struct ElegantClockView: View {
     @Binding var showBattery: Bool
     @Binding var showCalendar: Bool
     @Binding var nightColorTheme: NightColorTheme
+    @Binding var fontFamily: FontFamily
     @Binding var batteryLevel: Float
     @Binding var isCharging: Bool
     @Binding var deviceOrientation: UIDeviceOrientation
@@ -46,14 +47,14 @@ struct ElegantClockView: View {
                                 viewMode = (viewMode == .clock) ? .gallery : .clock
                             }) {
                                 Image(systemName: viewMode == .clock ? "photo.on.rectangle" : "clock")
-                                    .font(.system(size: 16))
+                                    .font(fontFamily.font(size: 16))
                                     .foregroundColor(textColor.opacity(0.4))
                             }
                             
                             // Settings button
                             Button(action: { showSettings = true }) {
                                 Image(systemName: "gearshape.fill")
-                                    .font(.system(size: 18))
+                                    .font(fontFamily.font(size: 18))
                                     .foregroundColor(textColor.opacity(0.4))
                             }
                         }
@@ -119,21 +120,21 @@ struct ElegantClockView: View {
         if let current = weatherService.currentWeather {
             HStack(spacing: 12) {
                 Text(weatherIconForCondition(current.weather.first?.main ?? "Clear"))
-                    .font(.system(size: 24))
+                    .font(fontFamily.font(size: 24))
                     .opacity(brightness)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(Int(current.main.temp))°")
-                        .font(.system(size: 20, weight: .medium))
+                        .font(fontFamily.font(size: 20, weight: .medium))
                         .foregroundColor(textColor)
                     
                     Text(current.weather.first?.description.capitalized ?? "Clear")
-                        .font(.caption)
+                        .font(fontFamily.font(size: 12))
                         .foregroundColor(textColor.opacity(0.6))
                     
                     let locationName = weatherService.selectedCity?.name ?? weatherService.currentLocationName ?? "Location Unknown"
                     Text(locationName)
-                        .font(.caption2)
+                        .font(fontFamily.font(size: 10))
                         .foregroundColor(textColor.opacity(0.5))
                 }
             }
@@ -145,24 +146,24 @@ struct ElegantClockView: View {
         if let current = weatherService.currentWeather {
             HStack(spacing: 12) {
                 Text(weatherIconForCondition(current.weather.first?.main ?? "Clear"))
-                    .font(.system(size: 24))
+                    .font(fontFamily.font(size: 24))
                     .opacity(brightness)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     // Temperature and location on same line for landscape
                     HStack(spacing: 8) {
                         Text("\(Int(current.main.temp))°")
-                            .font(.system(size: 20, weight: .medium))
+                            .font(fontFamily.font(size: 20, weight: .medium))
                             .foregroundColor(textColor)
                         
                         let locationName = weatherService.selectedCity?.name ?? weatherService.currentLocationName ?? "Location Unknown"
                         Text(locationName)
-                            .font(.system(size: 20, weight: .light))
+                            .font(fontFamily.font(size: 20, weight: .light))
                             .foregroundColor(textColor.opacity(0.7))
                     }
                     
                     Text(current.weather.first?.description.capitalized ?? "Clear")
-                        .font(.caption)
+                        .font(fontFamily.font(size: 12))
                         .foregroundColor(textColor.opacity(0.6))
                 }
             }
@@ -180,14 +181,14 @@ struct ElegantClockView: View {
         VStack(spacing: 12) {
             // Month header
             Text(DateFormatter().monthSymbols[currentMonth - 1])
-                .font(.system(size: 14, weight: .medium))
+                .font(fontFamily.font(size: 14, weight: .medium))
                 .foregroundColor(textColor.opacity(0.8))
             
             // Weekday headers
             HStack(spacing: 0) {
                 ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { index, day in
                     Text(day)
-                        .font(.system(size: 10))
+                        .font(fontFamily.font(size: 10))
                         .foregroundColor(textColor.opacity(0.5))
                         .frame(maxWidth: .infinity)
                 }
@@ -204,7 +205,7 @@ struct ElegantClockView: View {
                     
                     if dayNumber > 0 && dayNumber <= daysInMonth {
                         Text("\(dayNumber)")
-                            .font(.system(size: 11))
+                            .font(fontFamily.font(size: 11))
                             .foregroundColor(dayNumber == currentDay ? .black : textColor.opacity(0.8))
                             .frame(width: 20, height: 20)
                             .background(
@@ -228,12 +229,12 @@ struct ElegantClockView: View {
             if showBattery {
                 HStack(spacing: 6) {
                     Image(systemName: isCharging ? "battery.100.bolt" : "battery.100")
-                        .font(.system(size: 12))
+                        .font(fontFamily.font(size: 12))
                         .foregroundColor(batteryColor)
                     
                     if batteryLevel >= 0 {
                         Text("\(Int(batteryLevel * 100))%")
-                            .font(.system(size: 12))
+                            .font(fontFamily.font(size: 12))
                             .foregroundColor(textColor.opacity(0.6))
                     }
                 }
@@ -244,19 +245,19 @@ struct ElegantClockView: View {
             // Brightness control
             HStack(spacing: 8) {
                 Image(systemName: "sun.min")
-                    .font(.system(size: 10))
+                    .font(fontFamily.font(size: 10))
                     .foregroundColor(textColor.opacity(0.4))
                 
                 Slider(value: $brightness, in: 0.1...1.0)
                     .frame(width: 80)
                     .accentColor(textColor.opacity(0.4))
                     .scaleEffect(0.8)
-                    .onChange(of: brightness) { _, newValue in
-                        print("🔆 Brightness slider changed to: \(newValue)")
-                    }
+                    // .onChange(of: brightness) { _, newValue in
+                    //     print("🔆 Brightness slider changed to: \(newValue)")
+                    // }
                 
                 Image(systemName: "sun.max")
-                    .font(.system(size: 10))
+                    .font(fontFamily.font(size: 10))
                     .foregroundColor(textColor.opacity(0.4))
             }
         }
@@ -270,17 +271,16 @@ struct ElegantClockView: View {
             // Main time display - centered and prominent
             VStack(spacing: 16) {
                 Text(timeString)
-                    .font(.system(
+                    .font(fontFamily.font(
                         size: min(geometry.size.width * 0.18, 80),
-                        weight: .ultraLight,
-                        design: .rounded
+                        weight: .ultraLight
                     ))
                     .foregroundColor(textColor)
                     .monospacedDigit()
                 
                 if showDate {
                     Text(dateString)
-                        .font(.system(size: 18, weight: .light))
+                        .font(fontFamily.font(size: 18, weight: .light))
                         .foregroundColor(textColor.opacity(0.7))
                 }
             }
@@ -323,17 +323,16 @@ struct ElegantClockView: View {
                 // Time display
                 VStack(spacing: 12) {
                     Text(timeString)
-                        .font(.system(
+                        .font(fontFamily.font(
                             size: min(geometry.size.width * 0.11, 65),
-                            weight: .ultraLight,
-                            design: .rounded
+                            weight: .ultraLight
                         ))
                         .foregroundColor(textColor)
                         .monospacedDigit()
                     
                     if showDate {
                         Text(dateString)
-                            .font(.system(size: 16, weight: .light))
+                            .font(fontFamily.font(size: 16, weight: .light))
                             .foregroundColor(textColor.opacity(0.7))
                     }
                 }
