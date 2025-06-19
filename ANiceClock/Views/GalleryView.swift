@@ -12,6 +12,10 @@ struct GalleryView: View {
     let fontFamily: FontFamily
     @ObservedObject var weatherService: WeatherService
     @ObservedObject var galleryManager: GalleryManager
+    let showHumidity: Bool
+    let showUVIndex: Bool
+    let showWindSpeed: Bool
+    let temperatureUnit: TemperatureUnit
     let onTapToGoBack: () -> Void
     
     // State for draggable glass panel
@@ -25,7 +29,7 @@ struct GalleryView: View {
     private let panelPositionYKey = "ANiceClock_GalleryPanelY"
     
     // Initialize with saved position or default
-    init(currentTime: Date, brightness: Double, is24HourFormat: Bool, showSeconds: Bool, showDate: Bool, showWeather: Bool, glassPanelOpacity: Double, fontFamily: FontFamily, weatherService: WeatherService, galleryManager: GalleryManager, onTapToGoBack: @escaping () -> Void) {
+    init(currentTime: Date, brightness: Double, is24HourFormat: Bool, showSeconds: Bool, showDate: Bool, showWeather: Bool, glassPanelOpacity: Double, fontFamily: FontFamily, weatherService: WeatherService, galleryManager: GalleryManager, showHumidity: Bool, showUVIndex: Bool, showWindSpeed: Bool, temperatureUnit: TemperatureUnit, onTapToGoBack: @escaping () -> Void) {
         self.currentTime = currentTime
         self.brightness = brightness
         self.is24HourFormat = is24HourFormat
@@ -36,6 +40,10 @@ struct GalleryView: View {
         self.fontFamily = fontFamily
         self.weatherService = weatherService
         self.galleryManager = galleryManager
+        self.showHumidity = showHumidity
+        self.showUVIndex = showUVIndex
+        self.showWindSpeed = showWindSpeed
+        self.temperatureUnit = temperatureUnit
         self.onTapToGoBack = onTapToGoBack
         
         // Load saved position immediately to prevent flying animation
@@ -69,6 +77,10 @@ struct GalleryView: View {
                     glassPanelOpacity: glassPanelOpacity,
                     fontFamily: fontFamily,
                     weatherService: weatherService,
+                    showHumidity: showHumidity,
+                    showUVIndex: showUVIndex,
+                    showWindSpeed: showWindSpeed,
+                    temperatureUnit: temperatureUnit,
                     onTapToGoBack: onTapToGoBack,
                     isDragging: isDragging
                 )
@@ -198,6 +210,10 @@ struct GalleryInfoPanel: View {
     let glassPanelOpacity: Double
     let fontFamily: FontFamily
     @ObservedObject var weatherService: WeatherService
+    let showHumidity: Bool
+    let showUVIndex: Bool
+    let showWindSpeed: Bool
+    let temperatureUnit: TemperatureUnit
     let onTapToGoBack: () -> Void
     let isDragging: Bool
     
@@ -241,7 +257,7 @@ struct GalleryInfoPanel: View {
                             .font(.system(size: 20))
                             .shadow(color: .black.opacity(0.6), radius: 2, x: 1, y: 1)
                         
-                        Text("\(Int(current.main.temp.rounded()))°")
+                        Text(formattedTemperature(current.main.temp))
                             .font(fontFamily.font(size: 16, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.95))
                             .shadow(color: .black.opacity(0.7), radius: 3, x: 1, y: 1)
@@ -257,6 +273,52 @@ struct GalleryInfoPanel: View {
                             .foregroundStyle(Color.white.opacity(0.8))
                             .shadow(color: .black.opacity(0.6), radius: 2, x: 1, y: 1)
                     }
+                    
+                    // Additional Weather Details
+                    VStack(alignment: .leading, spacing: 3) {
+                        if showHumidity {
+                            HStack(spacing: 6) {
+                                Text("Humidity")
+                                    .font(fontFamily.font(size: 14, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.7))
+                                    .shadow(color: .black.opacity(0.5), radius: 1, x: 1, y: 1)
+                                Text("\(current.main.humidity)%")
+                                    .font(fontFamily.font(size: 14, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.85))
+                                    .shadow(color: .black.opacity(0.5), radius: 1, x: 1, y: 1)
+                                Spacer()
+                            }
+                        }
+                        
+                        if showUVIndex && current.current.uvIndex > 0 {
+                            HStack(spacing: 6) {
+                                Text("UV Index")
+                                    .font(fontFamily.font(size: 14, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.7))
+                                    .shadow(color: .black.opacity(0.5), radius: 1, x: 1, y: 1)
+                                Text(String(format: "%.1f", current.current.uvIndex))
+                                    .font(fontFamily.font(size: 14, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.85))
+                                    .shadow(color: .black.opacity(0.5), radius: 1, x: 1, y: 1)
+                                Spacer()
+                            }
+                        }
+                        
+                        if showWindSpeed && current.current.windSpeed > 0 {
+                            HStack(spacing: 6) {
+                                Text("Wind")
+                                    .font(fontFamily.font(size: 14, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.7))
+                                    .shadow(color: .black.opacity(0.5), radius: 1, x: 1, y: 1)
+                                Text(String(format: "%.1f km/h", current.current.windSpeed))
+                                    .font(fontFamily.font(size: 14, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.85))
+                                    .shadow(color: .black.opacity(0.5), radius: 1, x: 1, y: 1)
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
                 }
                 .padding(.top, 4)
             }
@@ -307,5 +369,10 @@ struct GalleryInfoPanel: View {
         case "mist", "fog", "haze": return "🌫️"
         default: return "☀️"
         }
+    }
+    
+    private func formattedTemperature(_ celsiusTemp: Double) -> String {
+        let convertedTemp = temperatureUnit.convert(temperature: celsiusTemp, from: .celsius)
+        return "\(Int(convertedTemp.rounded()))\(temperatureUnit.rawValue)"
     }
 }

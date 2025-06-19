@@ -24,6 +24,12 @@ struct ContentView: View {
     @AppStorage("ANiceClock_showCalendar") private var showCalendar = true
     @AppStorage("ANiceClock_nightColorTheme") private var nightColorTheme: NightColorTheme = .red
     @AppStorage("ANiceClock_fontFamily") private var fontFamily: FontFamily = .system
+    
+    // New weather display settings
+    @AppStorage("ANiceClock_showHumidity") private var showHumidity = true
+    @AppStorage("ANiceClock_showUVIndex") private var showUVIndex = true
+    @AppStorage("ANiceClock_showWindSpeed") private var showWindSpeed = true
+    @AppStorage("ANiceClock_temperatureUnit") private var temperatureUnit: TemperatureUnit = .celsius
 
     @State private var batteryLevel: Float = 0.0
     @State private var isCharging = false
@@ -64,7 +70,11 @@ struct ContentView: View {
                         deviceOrientation: $deviceOrientation,
                         viewMode: $viewMode,
                         weatherService: weatherService,
-                        calendarService: calendarService
+                        calendarService: calendarService,
+                        showHumidity: showHumidity,
+                        showUVIndex: showUVIndex,
+                        showWindSpeed: showWindSpeed,
+                        temperatureUnit: temperatureUnit
                     )
                     
                 case .gallery:
@@ -79,6 +89,10 @@ struct ContentView: View {
                         fontFamily: fontFamily,
                         weatherService: weatherService,
                         galleryManager: galleryManager,
+                        showHumidity: showHumidity,
+                        showUVIndex: showUVIndex,
+                        showWindSpeed: showWindSpeed,
+                        temperatureUnit: temperatureUnit,
                         onTapToGoBack: {
                             viewMode = .clock
                         }
@@ -123,7 +137,11 @@ struct ContentView: View {
                 viewMode: $viewMode,
                 galleryManager: galleryManager,
                 showingPhotoPicker: $showingPhotoPicker,
-                galleryDuration: $galleryDuration
+                galleryDuration: $galleryDuration,
+                showHumidity: $showHumidity,
+                showUVIndex: $showUVIndex,
+                showWindSpeed: $showWindSpeed,
+                temperatureUnit: $temperatureUnit
             )
         }
     }

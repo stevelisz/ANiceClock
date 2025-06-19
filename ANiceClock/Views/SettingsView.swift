@@ -20,6 +20,10 @@ struct SettingsView: View {
     @ObservedObject var galleryManager: GalleryManager
     @Binding var showingPhotoPicker: Bool
     @Binding var galleryDuration: Double
+    @Binding var showHumidity: Bool
+    @Binding var showUVIndex: Bool
+    @Binding var showWindSpeed: Bool
+    @Binding var temperatureUnit: TemperatureUnit
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -234,6 +238,36 @@ struct SettingsView: View {
                             .onChange(of: weatherService.selectedCity) { _, _ in
                                 weatherService.fetchWeather()
                             }
+                            
+                            Divider().padding(.leading, 20)
+                            
+                            // Temperature Unit Selection
+                            HStack {
+                                Text("Temperature Unit")
+                                Spacer()
+                                Picker("Temperature Unit", selection: $temperatureUnit) {
+                                    ForEach(TemperatureUnit.allCases, id: \.self) { unit in
+                                        Text(unit.displayName).tag(unit)
+                                    }
+                                }
+                                .pickerStyle(MenuPickerStyle())
+                            }
+                            
+                            Divider().padding(.leading, 20)
+                            
+                            // Weather Details Toggles
+                            Toggle("Show Humidity", isOn: $showHumidity)
+                                .disabled(!showWeather)
+                            
+                            Divider().padding(.leading, 20)
+                            
+                            Toggle("Show UV Index", isOn: $showUVIndex)
+                                .disabled(!showWeather)
+                            
+                            Divider().padding(.leading, 20)
+                            
+                            Toggle("Show Wind Speed", isOn: $showWindSpeed)
+                                .disabled(!showWeather)
                         }
                         .padding(.horizontal, 20)
                     }

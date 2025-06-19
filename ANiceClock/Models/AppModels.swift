@@ -2,6 +2,34 @@ import SwiftUI
 import CoreLocation
 import Photos
 
+// Temperature unit enum
+enum TemperatureUnit: String, CaseIterable {
+    case celsius = "°C"
+    case fahrenheit = "°F"
+    
+    var displayName: String {
+        switch self {
+        case .celsius: return "Celsius (°C)"
+        case .fahrenheit: return "Fahrenheit (°F)"
+        }
+    }
+    
+    func convert(temperature: Double, from sourceUnit: TemperatureUnit) -> Double {
+        if self == sourceUnit {
+            return temperature
+        }
+        
+        switch (sourceUnit, self) {
+        case (.celsius, .fahrenheit):
+            return (temperature * 9/5) + 32
+        case (.fahrenheit, .celsius):
+            return (temperature - 32) * 5/9
+        default:
+            return temperature // This should never happen due to the initial check, but Swift requires exhaustive switch
+        }
+    }
+}
+
 // Color theme options
 enum NightColorTheme: String, CaseIterable {
     case red = "Red"
@@ -49,6 +77,12 @@ struct CurrentWeather: Codable {
     let apparent_temperature: Double
     let relative_humidity_2m: Double
     let weather_code: Int
+    let wind_speed_10m: Double?
+    let uv_index: Double?
+    
+    // Computed properties for easier access
+    var windSpeed: Double { wind_speed_10m ?? 0.0 }
+    var uvIndex: Double { uv_index ?? 0.0 }
 }
 
 struct DailyWeather: Codable {

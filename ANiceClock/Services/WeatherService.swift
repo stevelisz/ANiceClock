@@ -72,8 +72,8 @@ class WeatherService: NSObject, ObservableObject {
         
         print("🌤️ Fetching weather for: \(cityName ?? "Unknown") at \(lat), \(lon)")
         
-        // Open-Meteo API - Free, no API key required!
-        let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=7"
+        // Enhanced Open-Meteo API call with more comprehensive data including UV index
+        let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,uv_index&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=7"
         
         guard let url = URL(string: urlString) else {
             DispatchQueue.main.async {
@@ -83,11 +83,14 @@ class WeatherService: NSObject, ObservableObject {
             return
         }
         
+        print("🌐 API URL: \(urlString)")
+        
         URLSession.shared.dataTask(with: url) { data, response, error in
             DispatchQueue.main.async {
                 self.isLoading = false
                 
                 if let error = error {
+                    print("❌ Network error: \(error.localizedDescription)")
                     self.errorMessage = "Network error: \(error.localizedDescription)"
                     self.currentWeather = nil
                     self.forecast = []
@@ -95,24 +98,69 @@ class WeatherService: NSObject, ObservableObject {
                 }
                 
                 guard let data = data else {
+                    print("❌ No data received")
                     self.errorMessage = "No data received"
                     self.currentWeather = nil
                     self.forecast = []
                     return
                 }
                 
+                // Debug: Print raw response
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("📡 Raw API Response: \(jsonString)")
+                }
+                
                 do {
-                    let weatherData = try JSONDecoder().decode(WeatherData.self, from: data)
+                    // Decode using the enhanced Open-Meteo response structure
+                    let openMeteoResponse = try JSONDecoder().decode(OpenMeteoAPIResponse.self, from: data)
+                    
+                    // Convert to our WeatherData format
+                    let weatherData = self.convertOpenMeteoToWeatherData(openMeteoResponse, cityName: cityName)
+                    
+                    print("✅ Weather data decoded successfully")
+                    print("🌡️ Temperature: \(weatherData.current.temperature_2m)°C")
+                    print("🏙️ Location: \(cityName ?? "Unknown")")
+                    
                     self.currentWeather = weatherData
                     self.generateForecastFromDaily(weatherData, cityName: cityName)
                     self.errorMessage = nil
+                    
                 } catch {
+                    print("❌ Failed to decode weather data: \(error)")
+                    if let decodingError = error as? DecodingError {
+                        print("🔍 Decoding error details: \(decodingError)")
+                    }
                     self.errorMessage = "Failed to decode weather data: \(error.localizedDescription)"
                     self.currentWeather = nil
                     self.forecast = []
                 }
             }
         }.resume()
+    }
+    
+    // Convert Open-Meteo API response to our WeatherData format
+    private func convertOpenMeteoToWeatherData(_ response: OpenMeteoAPIResponse, cityName: String?) -> WeatherData {
+        let current = CurrentWeather(
+            temperature_2m: response.current.temperature_2m,
+            apparent_temperature: response.current.apparent_temperature,
+            relative_humidity_2m: response.current.relative_humidity_2m,
+            weather_code: response.current.weather_code,
+            wind_speed_10m: response.current.wind_speed_10m,
+            uv_index: response.current.uv_index
+        )
+        
+        let daily = DailyWeather(
+            time: response.daily.time,
+            temperature_2m_max: response.daily.temperature_2m_max,
+            temperature_2m_min: response.daily.temperature_2m_min,
+            weather_code: response.daily.weather_code
+        )
+        
+        return WeatherData(
+            current: current,
+            daily: daily,
+            timezone: response.timezone ?? cityName ?? "Unknown"
+        )
     }
     
     private func generateForecastFromDaily(_ weatherData: WeatherData, cityName: String?) {
@@ -175,6 +223,7 @@ extension WeatherService: CLLocationManagerDelegate {
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("❌ Location manager error: \(error.localizedDescription)")
         DispatchQueue.main.async {
             self.errorMessage = "Location access failed"
             self.currentWeather = nil
@@ -184,6 +233,7 @@ extension WeatherService: CLLocationManagerDelegate {
     }
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        print("🔐 Location authorization changed to: \(manager.authorizationStatus.rawValue)")
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
             // Only fetch weather if no city is selected (using current location)
@@ -203,4 +253,29 @@ extension WeatherService: CLLocationManagerDelegate {
             break
         }
     }
+}
+
+// MARK: - Open-Meteo API Response Models
+// These match the exact structure from the working example
+
+struct OpenMeteoAPIResponse: Codable {
+    let current: OpenMeteoCurrentWeather
+    let daily: OpenMeteoDailyData
+    let timezone: String?
+}
+
+struct OpenMeteoCurrentWeather: Codable {
+    let temperature_2m: Double
+    let relative_humidity_2m: Double
+    let apparent_temperature: Double
+    let wind_speed_10m: Double
+    let weather_code: Int
+    let uv_index: Double?
+}
+
+struct OpenMeteoDailyData: Codable {
+    let time: [String]
+    let temperature_2m_max: [Double]
+    let temperature_2m_min: [Double]
+    let weather_code: [Int]
 } 

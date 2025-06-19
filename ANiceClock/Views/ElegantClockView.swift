@@ -22,6 +22,12 @@ struct ElegantClockView: View {
     @ObservedObject var weatherService: WeatherService
     @ObservedObject var calendarService: CalendarService
     
+    // New weather display settings
+    let showHumidity: Bool
+    let showUVIndex: Bool
+    let showWindSpeed: Bool
+    let temperatureUnit: TemperatureUnit
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -124,7 +130,7 @@ struct ElegantClockView: View {
                     .opacity(brightness)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Int(current.main.temp))°")
+                    Text(formattedTemperature(current.main.temp))
                         .font(fontFamily.font(size: 20, weight: .medium))
                         .foregroundColor(textColor)
                     
@@ -136,6 +142,46 @@ struct ElegantClockView: View {
                     Text(locationName)
                         .font(fontFamily.font(size: 10))
                         .foregroundColor(textColor.opacity(0.5))
+                    
+                    // Additional weather details for portrait mode
+                    VStack(alignment: .leading, spacing: 1) {
+                        if showHumidity {
+                            HStack(spacing: 4) {
+                                Text("Humidity")
+                                    .font(fontFamily.font(size: 10, weight: .medium))
+                                    .foregroundColor(textColor.opacity(0.4))
+                                Text("\(current.main.humidity)%")
+                                    .font(fontFamily.font(size: 10))
+                                    .foregroundColor(textColor.opacity(0.6))
+                                Spacer()
+                            }
+                        }
+                        
+                        if showUVIndex && current.current.uvIndex > 0 {
+                            HStack(spacing: 4) {
+                                Text("UV Index")
+                                    .font(fontFamily.font(size: 10, weight: .medium))
+                                    .foregroundColor(textColor.opacity(0.4))
+                                Text(String(format: "%.1f", current.current.uvIndex))
+                                    .font(fontFamily.font(size: 10))
+                                    .foregroundColor(textColor.opacity(0.6))
+                                Spacer()
+                            }
+                        }
+                        
+                        if showWindSpeed && current.current.windSpeed > 0 {
+                            HStack(spacing: 4) {
+                                Text("Wind")
+                                    .font(fontFamily.font(size: 10, weight: .medium))
+                                    .foregroundColor(textColor.opacity(0.4))
+                                Text(String(format: "%.0f km/h", current.current.windSpeed))
+                                    .font(fontFamily.font(size: 10))
+                                    .foregroundColor(textColor.opacity(0.6))
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(.top, 3)
                 }
             }
         }
@@ -152,7 +198,7 @@ struct ElegantClockView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     // Temperature and location on same line for landscape
                     HStack(spacing: 8) {
-                        Text("\(Int(current.main.temp))°")
+                        Text(formattedTemperature(current.main.temp))
                             .font(fontFamily.font(size: 20, weight: .medium))
                             .foregroundColor(textColor)
                         
@@ -161,6 +207,46 @@ struct ElegantClockView: View {
                             .font(fontFamily.font(size: 20, weight: .light))
                             .foregroundColor(textColor.opacity(0.7))
                     }
+                    
+                    // Additional weather details for landscape mode
+                    VStack(alignment: .leading, spacing: 2) {
+                        if showHumidity {
+                            HStack(spacing: 6) {
+                                Text("Humidity")
+                                    .font(fontFamily.font(size: 12, weight: .medium))
+                                    .foregroundColor(textColor.opacity(0.5))
+                                Text("\(current.main.humidity)%")
+                                    .font(fontFamily.font(size: 12))
+                                    .foregroundColor(textColor.opacity(0.7))
+                                Spacer()
+                            }
+                        }
+                        
+                        if showUVIndex && current.current.uvIndex > 0 {
+                            HStack(spacing: 6) {
+                                Text("UV Index")
+                                    .font(fontFamily.font(size: 12, weight: .medium))
+                                    .foregroundColor(textColor.opacity(0.5))
+                                Text(String(format: "%.1f", current.current.uvIndex))
+                                    .font(fontFamily.font(size: 12))
+                                    .foregroundColor(textColor.opacity(0.7))
+                                Spacer()
+                            }
+                        }
+                        
+                        if showWindSpeed && current.current.windSpeed > 0 {
+                            HStack(spacing: 6) {
+                                Text("Wind")
+                                    .font(fontFamily.font(size: 12, weight: .medium))
+                                    .foregroundColor(textColor.opacity(0.5))
+                                Text(String(format: "%.0f km/h", current.current.windSpeed))
+                                    .font(fontFamily.font(size: 12))
+                                    .foregroundColor(textColor.opacity(0.7))
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(.top, 6)
                     
                     Text(current.weather.first?.description.capitalized ?? "Clear")
                         .font(fontFamily.font(size: 12))
@@ -365,5 +451,10 @@ struct ElegantClockView: View {
             .frame(maxWidth: geometry.size.width * 0.4)
             .padding(.trailing, 40)
         }
+    }
+    
+    private func formattedTemperature(_ celsiusTemp: Double) -> String {
+        let convertedTemp = temperatureUnit.convert(temperature: celsiusTemp, from: .celsius)
+        return "\(Int(convertedTemp.rounded()))\(temperatureUnit.rawValue)"
     }
 } 
