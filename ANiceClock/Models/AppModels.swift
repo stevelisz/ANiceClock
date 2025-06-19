@@ -109,24 +109,4 @@ enum ViewMode: String, CaseIterable {
     var displayName: String {
         return self.rawValue
     }
-}
-
-// MARK: - Gallery Photo Model
-// Pure native approach - just store PHAsset IDs
-struct GalleryPhoto: Identifiable, Codable {
-    let id: String // PHAsset.localIdentifier
-    
-    init(assetID: String) {
-        self.id = assetID
-    }
-    
-    init(asset: PHAsset) {
-        self.id = asset.localIdentifier
-    }
-    
-    // Helper to get PHAsset when needed (on-demand)
-    var asset: PHAsset? {
-        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
-        return fetchResult.firstObject
-    }
 } 

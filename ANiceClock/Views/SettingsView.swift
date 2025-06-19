@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 // Enhanced Settings View
 struct SettingsView: View {
@@ -12,6 +13,7 @@ struct SettingsView: View {
     @Binding var showBattery: Bool
     @Binding var showCalendar: Bool
     @Binding var nightColorTheme: NightColorTheme
+    @Binding var glassPanelOpacity: Double
     @ObservedObject var weatherService: WeatherService
     @Binding var viewMode: ViewMode
     @ObservedObject var galleryManager: GalleryManager
@@ -80,46 +82,93 @@ struct SettingsView: View {
                             Toggle("Automatic (9pm - 7am)", isOn: $isAutoNightMode)
                                 .disabled(isNightMode == false)
                             
-                            Picker("Color Theme", selection: $nightColorTheme) {
-                                ForEach(NightColorTheme.allCases, id: \.self) { theme in
-                                    Text(theme.rawValue).tag(theme)
+                            // Color Theme Selection with Visual Colors
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Color Theme")
+                                    .foregroundColor(isNightMode ? .primary : .secondary)
+                                
+                                HStack(spacing: 16) {
+                                    ForEach(NightColorTheme.allCases, id: \.self) { theme in
+                                        Button(action: {
+                                            nightColorTheme = theme
+                                        }) {
+                                            Circle()
+                                                .fill(theme.color)
+                                                .frame(width: 32, height: 32)
+                                                .overlay(
+                                                    Circle()
+                                                        .stroke(nightColorTheme == theme ? Color.white : Color.clear, lineWidth: 3)
+                                                )
+                                                .overlay(
+                                                    Circle()
+                                                        .stroke(nightColorTheme == theme ? Color.gray : Color.clear, lineWidth: 1)
+                                                )
+                                        }
+                                        .disabled(isNightMode == false)
+                                    }
                                 }
                             }
-                            .disabled(isNightMode == false)
                         }
                         .padding(.horizontal, 20)
                     }
                     .padding(.bottom, 30)
                     
                     // Gallery Settings
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Gallery")
-                            .font(.headline)
-                            .padding(.horizontal, 20)
+                    Section("Gallery") {
+                        HStack {
+                            Text("Selected Photos")
+                            Spacer()
+                            Text("\(galleryManager.selectedPhotos.count)")
+                                .foregroundColor(.secondary)
+                        }
                         
-                        VStack(spacing: 12) {
-                            Button(action: {
-                                showingPhotoPicker = true
-                            }) {
-                                HStack {
-                                    Image(systemName: "photo.on.rectangle.angled")
-                                    Text("Select Photos")
-                                }
+                        HStack {
+                            PhotoPickerView(galleryManager: galleryManager, isPresented: $showingPhotoPicker)
+                            
+                            Spacer()
+                            
+                            Button("Clear All") {
+                                galleryManager.clearAllPhotos()
+                            }
+                            .foregroundColor(.red)
+                            .disabled(galleryManager.selectedPhotos.isEmpty)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Slideshow Duration")
+                                Spacer()
+                                Text("\(Int(galleryDuration))s")
+                                    .foregroundColor(.secondary)
                             }
                             
-                            HStack {
-                                Text("Slideshow Speed")
-                                Spacer()
-                                Slider(value: $galleryDuration, in: 3...30, step: 1)
-                                    .frame(width: 150)
-                                    .accentColor(.secondary)
-                                    .onChange(of: galleryDuration) { _, newValue in
-                                        galleryManager.slideshowDuration = newValue
-                                    }
-                                Text("\(Int(galleryDuration))s")
+                            Slider(
+                                value: $galleryDuration,
+                                in: 5...60,
+                                step: 5
+                            )
+                            .onChange(of: galleryDuration) { _, newValue in
+                                galleryManager.updateSlideshowDuration(newValue)
                             }
                         }
-                        .padding(.horizontal, 20)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Info Panel Transparency")
+                                Spacer()
+                                Text("\(Int((1.0 - glassPanelOpacity) * 100))%")
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Slider(
+                                value: Binding(
+                                    get: { 1.0 - glassPanelOpacity },
+                                    set: { glassPanelOpacity = 1.0 - $0 }
+                                ),
+                                in: 0...1,
+                                step: 0.05
+                            )
+                        }
                     }
                     .padding(.bottom, 30)
                     
@@ -148,9 +197,6 @@ struct SettingsView: View {
             .navigationBarItems(trailing: Button("Done") {
                 dismiss()
             })
-            .sheet(isPresented: $showingPhotoPicker) {
-                PhotoCollectionPickerView(galleryManager: galleryManager)
-            }
         }
     }
-} 
+}

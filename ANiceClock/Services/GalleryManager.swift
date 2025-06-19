@@ -1,230 +1,232 @@
-import SwiftUI
+import Foundation
 import Photos
 import UIKit
+import PhotosUI
 
-// MARK: - Gallery Manager (Pure Native PHAsset Approach)
+// MARK: - Native Gallery Manager - Asset IDs Only (No Storage Bloat)
 class GalleryManager: ObservableObject {
-    @Published var selectedAssetIDs: [String] = []
-    @Published var currentAssetIndex = 0
-    @Published var hasPermission = false
-    @Published var isLoading = false
-    @Published var currentDisplayImage: UIImage?
+    @Published var selectedAssetIDs: [String] = [] // Only store Photo Library asset IDs
+    @Published var currentIndex = 0
+    @Published var currentImage: UIImage?
     
     private var slideshowTimer: Timer?
-    var slideshowDuration: TimeInterval = 10.0 // Default 10 seconds, configurable
+    var slideshowDuration: TimeInterval = 10.0
     
+    // In-memory cache for performance (automatically managed by iOS)
+    private var imageCache = NSCache<NSString, UIImage>()
+    
+    // UserDefaults keys
     private let selectedAssetIDsKey = "ANiceClock_SelectedAssetIDs"
     private let slideshowDurationKey = "ANiceClock_SlideshowDuration"
     
     init() {
-        loadPersistedData()
-        checkPermission()
+        setupCache()
+        loadSavedData()
+        print("📱 GalleryManager initialized with \(selectedAssetIDs.count) asset IDs")
     }
     
-    // MARK: - Persistence (Pure Native - just asset ID strings)
-    private func loadPersistedData() {
-        // Load slideshow duration
-        let savedDuration = UserDefaults.standard.object(forKey: slideshowDurationKey) as? TimeInterval
-        if let duration = savedDuration {
-            slideshowDuration = duration
-        }
-        
-        // Load selected asset IDs
-        if let savedAssetIDs = UserDefaults.standard.stringArray(forKey: selectedAssetIDsKey) {
-            // Filter out assets that no longer exist in photo library
-            let validAssetIDs = savedAssetIDs.filter { assetID in
-                let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
-                return fetchResult.firstObject != nil
-            }
-            selectedAssetIDs = validAssetIDs
-            print("🔵 Loaded \(validAssetIDs.count) valid assets from persistence")
-            
-            // Load first image if we have assets
-            if !selectedAssetIDs.isEmpty {
-                loadCurrentImage()
-            }
-        }
+    private func setupCache() {
+        imageCache.countLimit = 50 // Keep max 50 images in memory
+        imageCache.totalCostLimit = 100 * 1024 * 1024 // 100MB memory limit
     }
     
-    private func savePersistedData() {
-        UserDefaults.standard.set(selectedAssetIDs, forKey: selectedAssetIDsKey)
-        UserDefaults.standard.set(slideshowDuration, forKey: slideshowDurationKey)
-        print("🔵 Saved \(selectedAssetIDs.count) asset IDs to persistence")
-    }
-    
-    // MARK: - Asset Management (Pure Native)
-    func addAsset(_ asset: PHAsset) {
-        let assetID = asset.localIdentifier
-        print("🔵 addAsset called with asset ID: \(assetID)")
-        print("🔵 Current selectedAssetIDs count: \(selectedAssetIDs.count)")
-        
-        // Native duplicate prevention - PHAsset IDs are unique
-        if !selectedAssetIDs.contains(assetID) {
-            print("🔵 Asset is new, adding to collection...")
-            selectedAssetIDs.append(assetID)
-            print("🔵 New selectedAssetIDs count: \(selectedAssetIDs.count)")
-            savePersistedData()
-            
-            if selectedAssetIDs.count == 1 {
-                print("🔵 First asset added, starting slideshow...")
-                startSlideshow()
-            }
-        } else {
-            print("🔵 Asset already exists in collection, skipping duplicate")
-        }
-    }
-    
-    func removeAsset(withID assetID: String) {
-        print("🔵 removeAsset called for ID: \(assetID)")
-        print("🔵 Current selectedAssetIDs: \(selectedAssetIDs)")
-        print("🔵 Current index: \(currentAssetIndex)")
-        
-        // Find the index of the asset to remove
-        guard let indexToRemove = selectedAssetIDs.firstIndex(of: assetID) else {
-            print("❌ Asset ID not found in collection")
+    // MARK: - Asset-Based Photo Management (No File Storage)
+    func addPhotoAsset(assetID: String) {
+        // Check if this asset is already selected
+        if selectedAssetIDs.contains(assetID) {
+            print("📸 Photo already selected, skipping: \(assetID)")
             return
         }
         
-        print("🔵 Found asset at index: \(indexToRemove)")
+        // Only store the asset ID - no file copying
+        selectedAssetIDs.append(assetID)
+        saveAssetIDs()
+        print("✅ Asset ID added: \(assetID) (no local copy)")
         
-        // Remove the asset
-        selectedAssetIDs.remove(at: indexToRemove)
-        print("🔵 Asset removed. New count: \(selectedAssetIDs.count)")
+        // Load this image if it's the first one
+        if selectedAssetIDs.count == 1 {
+            loadCurrentImageFromAsset()
+        }
+    }
+    
+    func removePhoto(at index: Int) {
+        guard index < selectedAssetIDs.count else { return }
         
-        // Adjust currentAssetIndex based on what was removed
-        if indexToRemove < currentAssetIndex {
-            // Removed asset was before current index, shift index down
-            currentAssetIndex -= 1
-            print("🔵 Adjusted currentAssetIndex to: \(currentAssetIndex)")
-        } else if indexToRemove == currentAssetIndex {
-            // Removed the currently displayed asset
-            if selectedAssetIDs.isEmpty {
-                // No more assets
-                print("🔵 No more assets, stopping slideshow")
-                stopSlideshow()
-                currentDisplayImage = nil
-                currentAssetIndex = 0
-            } else {
-                // Load new current asset (stay at same index, or wrap to 0 if at end)
-                if currentAssetIndex >= selectedAssetIDs.count {
-                    currentAssetIndex = 0
+        let assetID = selectedAssetIDs[index]
+        
+        // Remove from selection
+        selectedAssetIDs.remove(at: index)
+        
+        // Remove from cache
+        imageCache.removeObject(forKey: assetID as NSString)
+        
+        // Adjust current index
+        if currentIndex >= selectedAssetIDs.count {
+            currentIndex = max(0, selectedAssetIDs.count - 1)
+        }
+        
+        saveAssetIDs()
+        loadCurrentImageFromAsset()
+        print("🗑️ Asset ID removed: \(assetID)")
+    }
+    
+    func clearAllPhotos() {
+        stopSlideshow()
+        
+        selectedAssetIDs.removeAll()
+        currentIndex = 0
+        currentImage = nil
+        imageCache.removeAllObjects()
+        saveAssetIDs()
+        print("🗑️ All asset IDs removed (no files deleted)")
+    }
+    
+    // MARK: - On-Demand Image Loading from Photo Library
+    private func loadCurrentImageFromAsset() {
+        guard !selectedAssetIDs.isEmpty, currentIndex < selectedAssetIDs.count else {
+            currentImage = nil
+            return
+        }
+        
+        let assetID = selectedAssetIDs[currentIndex]
+        loadImageFromAsset(assetID: assetID) { [weak self] image in
+            DispatchQueue.main.async {
+                self?.currentImage = image
+                if image != nil {
+                    print("🖼️ Loaded image from Photo Library: \(assetID)")
+                } else {
+                    print("❌ Failed to load image from Photo Library: \(assetID)")
                 }
-                print("🔵 Loading new current asset at index: \(currentAssetIndex)")
-                loadCurrentImage()
             }
         }
-        // If indexToRemove > currentAssetIndex, no adjustment needed
-        
-        savePersistedData()
     }
     
-    func clearSelectedAssets() {
-        selectedAssetIDs.removeAll()
-        savePersistedData()
-        stopSlideshow()
-        currentDisplayImage = nil
-        currentAssetIndex = 0
-    }
-    
-    // MARK: - Image Loading (On-Demand, Memory Efficient)
-    private func loadCurrentImage() {
-        guard !selectedAssetIDs.isEmpty else { return }
-        let currentAssetID = selectedAssetIDs[currentAssetIndex]
-        print("🔵 Loading current image for asset: \(currentAssetID)")
+    private func loadImageFromAsset(assetID: String, completion: @escaping (UIImage?) -> Void) {
+        // Check cache first
+        if let cachedImage = imageCache.object(forKey: assetID as NSString) {
+            completion(cachedImage)
+            return
+        }
         
-        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [currentAssetID], options: nil)
-        guard let asset = fetchResult.firstObject else { 
-            print("❌ Could not fetch asset: \(currentAssetID)")
-            return 
+        // Load from Photo Library
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
+        
+        guard let asset = fetchResult.firstObject else {
+            completion(nil)
+            return
         }
         
         let options = PHImageRequestOptions()
         options.deliveryMode = .highQualityFormat
+        options.isNetworkAccessAllowed = true // Allow iCloud downloads
         options.isSynchronous = false
-        
-        let targetSize = CGSize(width: 1000, height: 1000) // Reasonable size for display
         
         PHImageManager.default().requestImage(
             for: asset,
-            targetSize: targetSize,
-            contentMode: .aspectFit,
+            targetSize: CGSize(width: 1920, height: 1920), // High quality for gallery
+            contentMode: .aspectFill,
             options: options
-        ) { [weak self] image, _ in
-            DispatchQueue.main.async {
-                if let image = image {
-                    print("✅ Current image loaded successfully")
-                    self?.currentDisplayImage = image
-                } else {
-                    print("❌ Failed to load current image")
-                }
+        ) { [weak self] image, info in
+            if let image = image {
+                // Cache the loaded image
+                self?.imageCache.setObject(image, forKey: assetID as NSString)
             }
+            completion(image)
         }
     }
     
-    // MARK: - Slideshow Control
+    func ensureCurrentImageLoaded() {
+        if currentImage == nil && !selectedAssetIDs.isEmpty {
+            loadCurrentImageFromAsset()
+        }
+    }
+    
+    // MARK: - Slideshow
     func startSlideshow() {
-        guard !selectedAssetIDs.isEmpty else { return }
-        print("🔵 Starting slideshow with \(selectedAssetIDs.count) assets")
+        guard !selectedAssetIDs.isEmpty && selectedAssetIDs.count > 1 else {
+            print("📷 Not starting slideshow - need at least 2 photos")
+            return
+        }
         
-        // Load the first image
-        loadCurrentImage()
+        stopSlideshow()
+        print("▶️ Starting slideshow with \(selectedAssetIDs.count) photos, duration: \(slideshowDuration)s")
         
-        // Start timer for slideshow
-        slideshowTimer = Timer.scheduledTimer(withTimeInterval: slideshowDuration, repeats: true) { [weak self] _ in
-            self?.nextPhoto()
+        slideshowTimer = Timer.scheduledTimer(withTimeInterval: slideshowDuration, repeats: true) { _ in
+            self.nextPhoto()
         }
     }
     
     func stopSlideshow() {
-        print("🔵 Stopping slideshow")
         slideshowTimer?.invalidate()
         slideshowTimer = nil
+        print("⏹️ Stopping slideshow")
     }
     
     func nextPhoto() {
         guard !selectedAssetIDs.isEmpty else { return }
-        currentAssetIndex = (currentAssetIndex + 1) % selectedAssetIDs.count
-        print("🔵 Next photo: index \(currentAssetIndex)")
-        loadCurrentImage()
+        currentIndex = (currentIndex + 1) % selectedAssetIDs.count
+        loadCurrentImageFromAsset()
+        print("➡️ Next photo: \(currentIndex + 1)/\(selectedAssetIDs.count)")
     }
     
     func previousPhoto() {
         guard !selectedAssetIDs.isEmpty else { return }
-        currentAssetIndex = currentAssetIndex > 0 ? currentAssetIndex - 1 : selectedAssetIDs.count - 1
-        print("🔵 Previous photo: index \(currentAssetIndex)")
-        loadCurrentImage()
+        currentIndex = currentIndex > 0 ? currentIndex - 1 : selectedAssetIDs.count - 1
+        loadCurrentImageFromAsset()
+        print("⬅️ Previous photo: \(currentIndex + 1)/\(selectedAssetIDs.count)")
     }
     
-    // MARK: - Permission Handling
-    private func checkPermission() {
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    // MARK: - Persistence (Only Asset IDs)
+    private func saveAssetIDs() {
+        UserDefaults.standard.set(selectedAssetIDs, forKey: selectedAssetIDsKey)
+        print("💾 Saved \(selectedAssetIDs.count) asset IDs to UserDefaults")
+    }
+    
+    private func loadSavedData() {
+        // Load asset IDs
+        if let savedAssetIDs = UserDefaults.standard.array(forKey: selectedAssetIDsKey) as? [String] {
+            selectedAssetIDs = savedAssetIDs
+        }
         
-        switch status {
-        case .authorized, .limited:
-            hasPermission = true
-        case .denied, .restricted:
-            hasPermission = false
-        case .notDetermined:
-            PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] newStatus in
-                DispatchQueue.main.async {
-                    self?.hasPermission = (newStatus == .authorized || newStatus == .limited)
-                }
-            }
-        @unknown default:
-            hasPermission = false
+        // Load slideshow duration
+        let savedDuration = UserDefaults.standard.double(forKey: slideshowDurationKey)
+        if savedDuration > 0 {
+            slideshowDuration = savedDuration
         }
+        
+        // Load current image
+        loadCurrentImageFromAsset()
+        
+        print("📁 Loaded \(selectedAssetIDs.count) asset IDs, duration: \(slideshowDuration)s")
     }
     
-    // MARK: - Gallery Display Support
-    func ensureCurrentImageLoaded() {
-        // Load current image if we have assets but no current display image
-        if !selectedAssetIDs.isEmpty && currentDisplayImage == nil {
-            loadCurrentImage()
+    func updateSlideshowDuration(_ newDuration: TimeInterval) {
+        slideshowDuration = newDuration
+        UserDefaults.standard.set(slideshowDuration, forKey: slideshowDurationKey)
+        
+        // Restart slideshow with new duration if it's running
+        if slideshowTimer != nil {
+            startSlideshow()
         }
+        
+        print("⏱️ Slideshow duration updated to \(slideshowDuration)s")
     }
     
-    // MARK: - Computed Properties for UI Compatibility
-    var selectedPhotos: [GalleryPhoto] {
-        return selectedAssetIDs.map { GalleryPhoto(assetID: $0) }
+    // MARK: - Selection State Management
+    func isAssetSelected(_ assetID: String) -> Bool {
+        return selectedAssetIDs.contains(assetID)
+    }
+    
+    func getSelectedAssetIDs() -> [String] {
+        return selectedAssetIDs
+    }
+    
+    // MARK: - Compatibility Properties for UI
+    var selectedPhotos: [String] {
+        return selectedAssetIDs // For compatibility with existing UI code
+    }
+    
+    var currentAssetIndex: Int {
+        return currentIndex
     }
 } 

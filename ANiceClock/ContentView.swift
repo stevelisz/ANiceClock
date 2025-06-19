@@ -27,6 +27,7 @@ struct ContentView: View {
     @State private var isCharging = false
     @State private var deviceOrientation = UIDeviceOrientation.unknown
     @State private var viewMode: ViewMode = .clock
+    @State private var glassPanelOpacity: Double = 0.85 // Default glass panel opacity
     
     @StateObject private var weatherService = WeatherService()
     @StateObject private var calendarService = CalendarService()
@@ -71,6 +72,7 @@ struct ContentView: View {
                         showSeconds: showSeconds,
                         showDate: showDate,
                         showWeather: showWeather,
+                        glassPanelOpacity: glassPanelOpacity,
                         weatherService: weatherService,
                         galleryManager: galleryManager,
                         onTapToGoBack: {
@@ -92,9 +94,10 @@ struct ContentView: View {
             weatherService.fetchWeather()
             // Initialize brightness to a reasonable default (80%)
             brightness = 0.8
-            // Sync gallery duration with manager
-            galleryManager.slideshowDuration = galleryDuration
+            // Sync UI with the saved gallery duration from manager
+            galleryDuration = galleryManager.slideshowDuration
             print("🔆 App brightness initialized to: \(brightness)")
+            print("🔵 Synced gallery duration from manager: \(galleryDuration)")
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
@@ -114,6 +117,7 @@ struct ContentView: View {
                 showBattery: $showBattery,
                 showCalendar: $showCalendar,
                 nightColorTheme: $nightColorTheme,
+                glassPanelOpacity: $glassPanelOpacity,
                 weatherService: weatherService,
                 viewMode: $viewMode,
                 galleryManager: galleryManager,

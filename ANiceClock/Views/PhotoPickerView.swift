@@ -2,302 +2,280 @@ import SwiftUI
 import Photos
 import PhotosUI
 
-// MARK: - Photo Collection Picker View (Native Approach)
-struct PhotoCollectionPickerView: View {
+// MARK: - Native Photo Picker with Selection State (Like Screenshots)
+struct PhotoPickerView: View {
     @ObservedObject var galleryManager: GalleryManager
-    @Environment(\.dismiss) private var dismiss
-    @State private var showingSystemPicker = false
+    @Binding var isPresented: Bool
     
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+    var body: some View {
+        Button("Select Photos") {
+            isPresented = true
+        }
+        .sheet(isPresented: $isPresented) {
+            NativePhotoPickerView(galleryManager: galleryManager, isPresented: $isPresented)
+        }
+    }
+}
+
+// MARK: - Native Photo Picker Implementation
+struct NativePhotoPickerView: View {
+    @ObservedObject var galleryManager: GalleryManager
+    @Binding var isPresented: Bool
+    @State private var allPhotos: [PHAsset] = []
+    @State private var selectedAssets: Set<String> = []
+    @State private var hasPermission = false
+    
+    private let columns = [
+        GridItem(.adaptive(minimum: 100, maximum: 120), spacing: 2)
+    ]
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 8) {
-                    // Add Photos Button
-                    AddPhotosButton {
-                        print("🔍 Add Photos button tapped - checking permission...")
-                        print("🔍 Current permission status: \(galleryManager.hasPermission)")
-                        print("🔍 Current photo count: \(galleryManager.selectedAssetIDs.count)")
-                        showingSystemPicker = true
-                    }
-                    
-                    // Grid of selected photos (native thumbnails)
-                    ForEach(galleryManager.selectedPhotos) { photo in
-                        SelectedPhotoThumbnail(
-                            photo: photo, 
-                            galleryManager: galleryManager,
-                            onRemove: {
-                                galleryManager.removeAsset(withID: photo.id)
-                            }
-                        )
-                    }
-                }
-                .padding(.horizontal)
-            }
-            .navigationTitle("Selected Photos (\(galleryManager.selectedAssetIDs.count))")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .fontWeight(.medium)
-                }
-            }
-            .sheet(isPresented: $showingSystemPicker) {
-                NativePHPickerView(galleryManager: galleryManager)
-            }
-        }
-    }
-}
-
-// MARK: - Native PHPicker Implementation
-struct NativePHPickerView: UIViewControllerRepresentable {
-    @ObservedObject var galleryManager: GalleryManager
-    @Environment(\.dismiss) private var dismiss
-    
-    func makeUIViewController(context: Context) -> PHPickerViewController {
-        print("🎯 Creating PHPickerViewController...")
-        
-        var config = PHPickerConfiguration()
-        config.filter = .images
-        config.selectionLimit = 0 // 0 means no limit
-        config.preferredAssetRepresentationMode = .current
-        
-        let picker = PHPickerViewController(configuration: config)
-        picker.delegate = context.coordinator
-        
-        print("🎯 PHPickerViewController created with config: images only, no limit")
-        return picker
-    }
-    
-    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, PHPickerViewControllerDelegate {
-        let parent: NativePHPickerView
-        
-        init(_ parent: NativePHPickerView) {
-            self.parent = parent
-            super.init()
-            print("🎯 PHPicker Coordinator initialized")
-        }
-        
-        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-            print("🎯 PHPicker didFinishPicking called with \(results.count) results")
-            
-            Task { @MainActor in
-                // Process each selected result
-                for (index, result) in results.enumerated() {
-                    print("🎯 Processing result \(index + 1)/\(results.count)")
-                    
-                    // Try the direct assetIdentifier first
-                    if let assetIdentifier = result.assetIdentifier {
-                        print("🎯 Got direct asset identifier: \(assetIdentifier)")
-                        
-                        // Fetch the PHAsset using the identifier
-                        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetIdentifier], options: nil)
-                        if let asset = fetchResult.firstObject {
-                            print("🎯 Successfully fetched PHAsset, adding to gallery...")
-                            parent.galleryManager.addAsset(asset)
-                            print("🎯 Asset added! New count: \(parent.galleryManager.selectedAssetIDs.count)")
-                        } else {
-                            print("❌ Failed to fetch PHAsset for identifier: \(assetIdentifier)")
+            Group {
+                if hasPermission {
+                    if allPhotos.isEmpty {
+                        VStack {
+                            ProgressView()
+                            Text("Loading photos...")
+                                .padding(.top)
                         }
                     } else {
-                        print("🎯 No direct asset identifier, trying alternative native approach...")
-                        
-                        // Alternative method: Try to get asset identifier from the itemProvider
-                        // This works by loading the data and then using Photos framework to find the asset
-                        if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                            print("🎯 ItemProvider has image data, attempting to find PHAsset...")
+                        VStack(spacing: 0) {
+                            // Photo count and clear button
+                            HStack {
+                                Text("\(selectedAssets.count) photos selected")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                if !selectedAssets.isEmpty {
+                                    Button("Clear All") {
+                                        selectedAssets.removeAll()
+                                    }
+                                    .foregroundColor(.red)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
                             
-                            // Load image data
-                            result.itemProvider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { [weak self] data, error in
-                                if let error = error {
-                                    print("❌ Error loading image data: \(error)")
-                                    return
-                                }
-                                
-                                guard let imageData = data, let image = UIImage(data: imageData) else {
-                                    print("❌ Failed to create image from data")
-                                    return
-                                }
-                                
-                                // Try to find matching PHAsset in photo library
-                                self?.findMatchingPHAsset(for: image) { asset in
-                                    DispatchQueue.main.async {
-                                        if let asset = asset {
-                                            print("🎯 Found matching PHAsset: \(asset.localIdentifier)")
-                                            self?.parent.galleryManager.addAsset(asset)
-                                            print("🎯 Asset added! New count: \(self?.parent.galleryManager.selectedAssetIDs.count ?? 0)")
-                                        } else {
-                                            print("❌ Could not find matching PHAsset for image")
-                                        }
+                            // Photo grid
+                            ScrollView {
+                                LazyVGrid(columns: columns, spacing: 2) {
+                                    ForEach(allPhotos.indices, id: \.self) { index in
+                                        let asset = allPhotos[index]
+                                        PhotoGridItem(
+                                            asset: asset,
+                                            isSelected: selectedAssets.contains(asset.localIdentifier),
+                                            onTap: {
+                                                toggleSelection(asset)
+                                            }
+                                        )
                                     }
                                 }
+                                .padding(.horizontal, 4)
                             }
-                        } else {
-                            print("❌ ItemProvider does not have image data")
                         }
                     }
+                } else {
+                    VStack(spacing: 16) {
+                        Image(systemName: "photo.fill.on.rectangle.fill")
+                            .font(.system(size: 64))
+                            .foregroundColor(.gray)
+                        
+                        Text("Photo Access Required")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        Text("Please allow access to your photo library to select photos for the gallery")
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                        
+                        Button("Grant Access") {
+                            requestPhotoPermission()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
                 }
-                
-                print("🎯 Finished processing all results, dismissing picker...")
-                // Dismiss the picker
-                parent.dismiss()
             }
-        }
-        
-        // Helper method to find matching PHAsset for an image
-        private func findMatchingPHAsset(for image: UIImage, completion: @escaping (PHAsset?) -> Void) {
-            print("🔍 Searching for matching PHAsset...")
-            
-            // Create fetch options to get recent photos
-            let fetchOptions = PHFetchOptions()
-            fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-            fetchOptions.fetchLimit = 100 // Check last 100 photos
-            
-            let fetchResult = PHAsset.fetchAssets(with: .image, options: fetchOptions)
-            
-            // Get image size for comparison
-            let targetSize = image.size
-            
-            DispatchQueue.global(qos: .userInitiated).async {
-                var foundAsset: PHAsset?
-                
-                fetchResult.enumerateObjects { asset, index, stop in
-                    // Compare image dimensions as a quick filter
-                    if abs(asset.pixelWidth - Int(targetSize.width)) < 10 && 
-                       abs(asset.pixelHeight - Int(targetSize.height)) < 10 {
-                        print("🔍 Found potential match at index \(index): \(asset.localIdentifier)")
-                        foundAsset = asset
-                        stop.pointee = true
+            .navigationTitle("Select Photos")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarItems(
+                leading: Button("Done") {
+                    isPresented = false
+                },
+                trailing: HStack {
+                    if !selectedAssets.isEmpty {
+                        Text("Selected: \(selectedAssets.count)")
+                            .foregroundColor(.blue)
+                            .font(.headline)
                     }
                 }
-                
-                completion(foundAsset)
-            }
-        }
-    }
-}
-
-// MARK: - Add Photos Button
-struct AddPhotosButton: View {
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 32))
-                    .foregroundColor(.blue)
-                Text("Add Photos")
-                    .font(.caption)
-                    .foregroundColor(.primary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .aspectRatio(1.0, contentMode: .fit)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.1))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.blue.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [5]))
-                    )
             )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onAppear {
+            loadCurrentSelection()
+            checkPhotoPermission()
+        }
+        .onDisappear {
+            saveSelection()
+        }
+    }
+    
+    private func checkPhotoPermission() {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        switch status {
+        case .authorized, .limited:
+            hasPermission = true
+            loadPhotos()
+        case .notDetermined:
+            requestPhotoPermission()
+        case .denied, .restricted:
+            hasPermission = false
+        @unknown default:
+            hasPermission = false
+        }
+    }
+    
+    private func requestPhotoPermission() {
+        PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    hasPermission = true
+                    loadPhotos()
+                default:
+                    hasPermission = false
+                }
+            }
+        }
+    }
+    
+    private func loadPhotos() {
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        
+        let fetchResult = PHAsset.fetchAssets(with: .image, options: fetchOptions)
+        
+        var photos: [PHAsset] = []
+        fetchResult.enumerateObjects { asset, _, _ in
+            photos.append(asset)
+        }
+        
+        DispatchQueue.main.async {
+            allPhotos = photos
+        }
+    }
+    
+    private func loadCurrentSelection() {
+        selectedAssets = Set(galleryManager.getSelectedAssetIDs())
+        print("📸 Loaded \(selectedAssets.count) previously selected photos")
+    }
+    
+    private func toggleSelection(_ asset: PHAsset) {
+        if selectedAssets.contains(asset.localIdentifier) {
+            selectedAssets.remove(asset.localIdentifier)
+        } else {
+            selectedAssets.insert(asset.localIdentifier)
+        }
+    }
+    
+    private func saveSelection() {
+        print("📸 Saving \(selectedAssets.count) selected asset IDs...")
+        
+        // Clear existing photos
+        galleryManager.clearAllPhotos()
+        
+        // Add selected asset IDs (no file copying)
+        for assetID in selectedAssets {
+            galleryManager.addPhotoAsset(assetID: assetID)
+        }
+        
+        print("✅ Saved \(selectedAssets.count) asset IDs (no storage used)")
     }
 }
 
-// MARK: - Selected Photo Thumbnail (Native Approach)
-struct SelectedPhotoThumbnail: View {
-    let photo: GalleryPhoto
-    let galleryManager: GalleryManager
-    let onRemove: () -> Void
+// MARK: - Photo Grid Item with Blue Selection Borders
+struct PhotoGridItem: View {
+    let asset: PHAsset
+    let isSelected: Bool
+    let onTap: () -> Void
     
-    @State private var thumbnailImage: UIImage?
-    
-    private let thumbnailSize = CGSize(width: 150, height: 150)
+    @State private var image: UIImage?
     
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            // Fixed square container
-            GeometryReader { geometry in
-                let size = min(geometry.size.width, geometry.size.height)
-                
-                ZStack {
-                    if let image = thumbnailImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: size, height: size)
-                            .clipped()
-                    } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: size, height: size)
-                            .overlay(
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .blue))
-                            )
-                    }
+        ZStack {
+            // Photo
+            Group {
+                if let image = image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .overlay(
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        )
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .frame(width: size, height: size)
             }
-            .aspectRatio(1.0, contentMode: .fit)
+            .frame(width: 100, height: 100)
+            .clipped()
+            .cornerRadius(8)
             
-            // Remove button (native removal)
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    onRemove()
-                }
-            }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(.red)
-                    .background(
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 18, height: 18)
-                    )
+            // Blue selection border (like native iOS behavior)
+            if isSelected {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.blue, lineWidth: 3)
+                    .frame(width: 100, height: 100)
             }
-            .padding(6)
+            
+            // Selection checkmark (top right corner)
+            VStack {
+                HStack {
+                    Spacer()
+                    ZStack {
+                        Circle()
+                            .fill(isSelected ? Color.blue : Color.black.opacity(0.5))
+                            .frame(width: 24, height: 24)
+                        
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                        } else {
+                            Circle()
+                                .stroke(Color.white, lineWidth: 2)
+                                .frame(width: 18, height: 18)
+                        }
+                    }
+                    .padding(8)
+                }
+                Spacer()
+            }
         }
-        .onAppear(perform: loadThumbnail)
+        .onTapGesture {
+            onTap()
+        }
+        .onAppear {
+            loadThumbnail()
+        }
     }
     
     private func loadThumbnail() {
-        // Load PHAsset thumbnail
-        guard let asset = photo.asset else { 
-            print("❌ No PHAsset found for photo ID: \(photo.id)")
-            return 
-        }
-        
         let options = PHImageRequestOptions()
-        options.deliveryMode = .opportunistic
-        options.isNetworkAccessAllowed = true
+        options.deliveryMode = .fastFormat
+        options.isNetworkAccessAllowed = false
+        options.isSynchronous = false
         
         PHImageManager.default().requestImage(
             for: asset,
-            targetSize: thumbnailSize,
+            targetSize: CGSize(width: 200, height: 200),
             contentMode: .aspectFill,
             options: options
         ) { image, _ in
             DispatchQueue.main.async {
-                if let image = image {
-                    print("✅ PHAsset thumbnail loaded successfully")
-                    self.thumbnailImage = image
-                } else {
-                    print("❌ Failed to load PHAsset thumbnail")
-                }
+                self.image = image
             }
         }
     }
